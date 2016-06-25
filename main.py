@@ -35,13 +35,30 @@ def get_svn_tree(svn_client, archive_path, include_files=True, include_dirs=True
     if include_dirs:
         allowed_kinds.add(pysvn.node_kind.dir)
 
-    return [entry for entry, _ in
-            svn_client.list(
-                archive_path,
-                dirent_fields=dirent_fields | pysvn.SVN_DIRENT_KIND,
-                recurse=True
-            )
-            if entry.kind in allowed_kinds]
+    dirs = [(archive_path, True)]
+    while dirs:
+        dir, yield_itself = dirs.pop(0)
+        dir_contents = svn_client.list(
+            dir,
+            dirent_fields=dirent_fields | pysvn.SVN_DIRENT_KIND,
+            recurse=False
+        )
+
+        # Special case: If we are listing the topmost directory, then we need to yield
+        # its own SVN node to the caller -- because otherwise, we would never yield it
+        # to the caller at all since below, we are only looking at the directory *contents*
+        # (and not the topmost directory itself).
+        if yield_itself:
+            yield dir_contents[0][0]
+
+        # Skip the listed directory itself (index 0). It gets included in its own listing
+        # for some reason...
+        for node, _ in dir_contents[1:]:
+            if node.kind == pysvn.node_kind.dir:
+                dirs.append((archive_path + node.repos_path, False))
+
+            if node.kind in allowed_kinds:
+                yield node
 
 
 def main():
@@ -49,15 +66,12 @@ def main():
     include_types = set([SvnExternalUrlType[x] for x in args.only_type])
     svn_client = pysvn.Client()
 
-    print >> sys.stderr, "Fetching directory tree..."
-    dirs = get_svn_tree(
-        svn_client,
-        args.archive_path,
-        include_files=False,
-        dirent_fields=pysvn.SVN_DIRENT_HAS_PROPS
-    )
-
-    for dir in dirs:
+    for dir in get_svn_tree(
+            svn_client,
+            args.archive_path,
+            include_files=False,
+            dirent_fields=pysvn.SVN_DIRENT_HAS_PROPS
+        ):
         print >> sys.stderr, "Checking directory `%s'..." % dir.repos_path
 
         if not dir.has_props:
