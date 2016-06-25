@@ -38,12 +38,12 @@ SvnExternal = namedtuple("SvnExternal", "subdir revopt url urltype")
 
 
 class SvnExternalUrlType(Enum):
-    ABSOLUTE                = 0
-    RELATIVE_DIR            = 1
-    RELATIVE_REPO_ROOT      = 2
-    RELATIVE_SCHEME         = 3
-    RELATIVE_SRV_ROOT       = 4
-    RELATIVE_SIBLING_REPO   = 5
+    ABSOLUTE = 0
+    RELATIVE_DIR = 1
+    RELATIVE_REPO_ROOT = 2
+    RELATIVE_SCHEME = 3
+    RELATIVE_SRV_ROOT = 4
+    RELATIVE_SIBLING_REPO = 5
 
 
 def _get_url_type(url):
@@ -63,6 +63,7 @@ def _get_url_type(url):
         return SvnExternalUrlType.RELATIVE_REPO_ROOT
     else:
         return SvnExternalUrlType.RELATIVE_DIR
+
 
 def parse_svn_externals(externals_str):
     externals = []
