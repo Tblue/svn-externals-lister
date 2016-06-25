@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 
-import os
-import subprocess
 import sys
 from argparse import ArgumentParser
+
+import pysvn
 
 from svn_externals import parse_svn_externals, SvnExternalUrlType
 
@@ -11,11 +11,6 @@ from svn_externals import parse_svn_externals, SvnExternalUrlType
 def get_argparser():
     parser = ArgumentParser(description="List all svn:externals properties in a SVN project archive.")
 
-    parser.add_argument(
-        "-s", "--svnlook-path",
-        default="svnlook",
-        help="Path to the `svnlook' binary. Default: `%(default)s'."
-    )
     parser.add_argument(
         "-t", "--only-type",
         action="append",
@@ -32,84 +27,59 @@ def get_argparser():
     return parser
 
 
-def get_svn_tree(svnlook_path, archive_path, subtree="/", include_files=True, include_dirs=True):
-    proc = subprocess.Popen(
-        [svnlook_path, "tree", "--full-paths", "--", archive_path, subtree],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True
-    )
-    stdout, stderr = proc.communicate()
+def get_svn_tree(svn_client, archive_path, include_files=True, include_dirs=True, dirent_fields=pysvn.SVN_DIRENT_ALL):
+    allowed_kinds = set()
 
-    if proc.returncode:
-        raise subprocess.CalledProcessError(
-            proc.returncode,
-            proc.args,
-            stderr
-        )
+    if include_files:
+        allowed_kinds.add(pysvn.node_kind.file)
+    if include_dirs:
+        allowed_kinds.add(pysvn.node_kind.dir)
 
-    tree = []
-    for line in stdout.splitlines():
-        if line.endswith("/"):
-            if include_dirs:
-                tree.append(line)
-        elif include_files:
-            tree.append(line)
-
-    return tree
-
-
-def get_svn_property(svnlook_path, archive_path, propname, node):
-    proc = subprocess.Popen(
-        [svnlook_path, "propget", "--", archive_path, propname, node],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-        env=dict(os.environ, LC_MESSAGES="C")
-    )
-    stdout, stderr = proc.communicate()
-
-    if proc.returncode:
-        if proc.returncode == 1 and "E200017" in stderr:
-            # Property not found.
-            return None
-
-        # Else it's another error.
-        raise subprocess.CalledProcessError(
-            proc.returncode,
-            proc.args,
-            stderr
-        )
-
-    return stdout
+    return [entry for entry, _ in
+            svn_client.list(
+                archive_path,
+                dirent_fields=dirent_fields | pysvn.SVN_DIRENT_KIND,
+                recurse=True
+            )
+            if entry.kind in allowed_kinds]
 
 
 def main():
     args = get_argparser().parse_args()
     include_types = set([SvnExternalUrlType[x] for x in args.only_type])
+    svn_client = pysvn.Client()
 
-    print("Fetching directory tree...", file=sys.stderr)
-    dirs = get_svn_tree(args.svnlook_path, args.archive_path, include_files=False)
+    print >> sys.stderr, "Fetching directory tree..."
+    dirs = get_svn_tree(
+        svn_client,
+        args.archive_path,
+        include_files=False,
+        dirent_fields=pysvn.SVN_DIRENT_HAS_PROPS
+    )
 
     for dir in dirs:
-        print("Checking directory `%s'..." % dir, file=sys.stderr)
+        print >> sys.stderr, "Checking directory `%s'..." % dir.repos_path
 
-        svn_externals = get_svn_property(args.svnlook_path, args.archive_path, "svn:externals", dir)
+        if not dir.has_props:
+            continue
+
+        svn_externals = svn_client.propget(
+            "svn:externals",
+            args.archive_path + "/" + dir.repos_path
+        )
         if not svn_externals:
             # No externals set on this directory.
             continue
 
-        parsed_externals = [x for x in parse_svn_externals(svn_externals)
+        parsed_externals = [x for x in parse_svn_externals(svn_externals.popitem()[1])
                             if not include_types or x.urltype in include_types]
         if parsed_externals:
-            print(dir)
+            print dir.repos_path
 
             for parsed_external in parsed_externals:
-                print("\t%s -> %s\t%s\t[%s]" % (
+                print "\t%s -> %s\t%s\t[%s]" % (
                     parsed_external.subdir, parsed_external.url, parsed_external.revopt, parsed_external.urltype.name
-                ))
+                )
 
 
 if __name__ == "__main__":

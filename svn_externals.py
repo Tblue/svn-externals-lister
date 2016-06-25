@@ -28,10 +28,10 @@
 # DAMAGE.
 
 import shlex
-
 from collections import namedtuple
+from urlparse import urlsplit
+
 from enum import Enum
-from urllib.parse import urlsplit
 
 
 SvnExternal = namedtuple("SvnExternal", "subdir revopt url urltype")
