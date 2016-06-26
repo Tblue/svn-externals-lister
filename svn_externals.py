@@ -31,6 +31,7 @@ import shlex
 from collections import namedtuple
 from urlparse import urlsplit
 
+# Available from PyPI as "enum34".
 from enum import Enum
 
 
