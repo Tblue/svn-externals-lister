@@ -20,6 +20,11 @@ def get_argparser():
         default=[],
         help="Only show externals with the given type. Can be specified more than once. Default: Show all types."
     )
+    parser.add_argument(
+        "-F", "--full-paths",
+        action="store_true",
+        help="Print full directory paths instead of indenting the contents of a directory."
+    )
 
     parser.add_argument(
         "archive_path",
@@ -93,11 +98,17 @@ def main():
         parsed_externals = [x for x in parse_svn_externals(svn_externals.popitem()[1])
                             if not include_types or x.urltype in include_types]
         if parsed_externals:
-            print dir.repos_path
+            if not args.full_paths:
+                print dir.repos_path
 
             for parsed_external in parsed_externals:
-                print "\t%s -> %s\t%s\t[%s]" % (
-                    parsed_external.subdir, parsed_external.url, parsed_external.revopt, parsed_external.urltype.name
+                if not args.full_paths:
+                    subdir = "\t" + parsed_external.subdir
+                else:
+                    subdir = dir.repos_path + "/" + parsed_external.subdir
+
+                print "%s -> %s\t%s\t[%s]" % (
+                    subdir, parsed_external.url, parsed_external.revopt, parsed_external.urltype.name
                 )
 
 
