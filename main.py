@@ -44,9 +44,9 @@ def get_svn_tree(svn_client, archive_path, include_files=True, include_dirs=True
 
     dirs = [(archive_path, True)]
     while dirs:
-        dir, yield_itself = dirs.pop(0)
+        dir_path, yield_itself = dirs.pop(0)
         dir_contents = svn_client.list(
-            dir,
+            dir_path,
             dirent_fields=dirent_fields | pysvn.SVN_DIRENT_KIND,
             recurse=False
         )
@@ -76,20 +76,20 @@ def main():
     if not urlsplit(args.archive_path).scheme:
         args.archive_path = "file://%s" % os.path.abspath(args.archive_path)
 
-    for dir in get_svn_tree(
+    for node in get_svn_tree(
             svn_client,
             args.archive_path,
             include_files=False,
             dirent_fields=pysvn.SVN_DIRENT_HAS_PROPS
     ):
-        print >> sys.stderr, "Checking directory `%s'..." % dir.repos_path
+        print >> sys.stderr, "Checking directory `%s'..." % node.repos_path
 
-        if not dir.has_props:
+        if not node.has_props:
             continue
 
         svn_externals = svn_client.propget(
             "svn:externals",
-            args.archive_path + "/" + dir.repos_path
+            args.archive_path + "/" + node.repos_path
         )
         if not svn_externals:
             # No externals set on this directory.
@@ -99,13 +99,13 @@ def main():
                             if not include_types or x.urltype in include_types]
         if parsed_externals:
             if not args.full_paths:
-                print dir.repos_path
+                print node.repos_path
 
             for parsed_external in parsed_externals:
                 if not args.full_paths:
                     subdir = "\t" + parsed_external.subdir
                 else:
-                    subdir = dir.repos_path + "/" + parsed_external.subdir
+                    subdir = node.repos_path + "/" + parsed_external.subdir
 
                 print "%s -> %s\t%s\t[%s]" % (
                     subdir, parsed_external.url, parsed_external.revopt, parsed_external.urltype.name
