@@ -1,7 +1,9 @@
 #!/usr/bin/env python2
 
+import os.path
 import sys
 from argparse import ArgumentParser
+from urlparse import urlsplit
 
 import pysvn
 
@@ -66,12 +68,15 @@ def main():
     include_types = set([SvnExternalUrlType[x] for x in args.only_type])
     svn_client = pysvn.Client()
 
+    if not urlsplit(args.archive_path).scheme:
+        args.archive_path = "file://%s" % os.path.abspath(args.archive_path)
+
     for dir in get_svn_tree(
             svn_client,
             args.archive_path,
             include_files=False,
             dirent_fields=pysvn.SVN_DIRENT_HAS_PROPS
-        ):
+    ):
         print >> sys.stderr, "Checking directory `%s'..." % dir.repos_path
 
         if not dir.has_props:
