@@ -4,6 +4,9 @@
 # Intended to be used on a Subversion project archive, not a working copy.
 #
 #
+# This file is part of svn-externals-lister (see
+# https://github.com/Tblue/svn-externals-lister).
+#
 # Copyright (c) 2016, Tilman Blumenbach <tilman (at) ax86 (dot) net>
 # All rights reserved.
 #
